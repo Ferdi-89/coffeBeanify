@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Dataset & Downloads (Bypass large files pushing)
+coffee-bean-dataset-resized-224-x-224.zip
+coffee-bean-dataset-resized-224-x-224/
+train/
+test/
+
+# Trained Models (Too large for Github)
+*.h5
+*.model
+*.keras
+backend/models/FineTunedCoffeeBeanCNN.model/
+backend/models/FineTunedCoffeeBeanCNN.keras
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.log

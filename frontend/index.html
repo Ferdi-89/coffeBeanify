@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coffee Bean Roast Classifier - Deteksi Kematangan Biji Kopi</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="container header-container">
+            <div class="logo">
+                <i class="fa-solid fa-mug-hot logo-icon"></i>
+                <span class="logo-text">RoastCode</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#classifier" class="active"><i class="fa-solid fa-wand-magic-sparkles"></i> Klasifikasi</a>
+                <a href="#quality-evaluator"><i class="fa-solid fa-clipboard-check"></i> Evaluasi Kualitas</a>
+                <a href="#dataset-stats"><i class="fa-solid fa-chart-simple"></i> Statistik</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <h1 class="hero-title">Ketahui Tingkat Kematangan Biji Kopi Anda</h1>
+            <p class="hero-subtitle">Klasifikasi tingkat sangrai (Roasting) biji kopi secara instan menggunakan Convolutional Neural Network (CNN) berbasis kecerdasan buatan.</p>
+        </section>
+
+        <!-- Main Classifier Section -->
+        <section id="classifier" class="section-container active-section">
+            <div class="grid-layout">
+                <!-- Left: Upload Card -->
+                <div class="card upload-card">
+                    <h2 class="card-title"><i class="fa-solid fa-image"></i> Unggah Gambar</h2>
+                    <p class="card-desc">Unggah foto biji kopi Anda (format PNG, JPG, atau JPEG).</p>
+                    
+                    <div id="dropzone" class="dropzone">
+                        <input type="file" id="file-input" accept="image/*" class="file-input">
+                        <div class="dropzone-content">
+                            <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                            <p class="dropzone-text">Tarik & lepas gambar di sini atau <span>pilih file</span></p>
+                            <span class="file-info-limit">Batas ukuran: 10MB</span>
+                        </div>
+                        <img id="image-preview" class="image-preview" src="" alt="Preview">
+                    </div>
+
+                    <div class="button-group">
+                        <button id="camera-btn" class="btn btn-secondary">
+                            <i class="fa-solid fa-camera"></i> Gunakan Kamera
+                        </button>
+                        <button id="classify-btn" class="btn btn-primary" disabled>
+                            <i class="fa-solid fa-bolt"></i> Mulai Klasifikasi
+                        </button>
+                    </div>
+                    
+                    <video id="camera-stream" class="camera-stream" autoplay playsinline></video>
+                    <button id="capture-btn" class="btn btn-success hidden">
+                        <i class="fa-solid fa-circle-dot"></i> Ambil Foto
+                    </button>
+                </div>
+
+                <!-- Right: Result Card -->
+                <div class="card result-card empty" id="result-card">
+                    <div class="result-placeholder">
+                        <i class="fa-solid fa-circle-question placeholder-icon"></i>
+                        <h3>Belum Ada Gambar</h3>
+                        <p>Silakan unggah gambar biji kopi dan tekan tombol **Mulai Klasifikasi** untuk melihat analisis tingkat sangrai.</p>
+                    </div>
+
+                    <div class="result-content hidden">
+                        <span class="badge" id="roast-badge">Medium Roast</span>
+                        <h2 class="result-title" id="roast-title">Medium Roast (American / City)</h2>
+                        
+                        <!-- Confidence Bar -->
+                        <div class="confidence-container">
+                            <div class="confidence-header">
+                                <span>Tingkat Keyakinan Model</span>
+                                <span id="confidence-val">98.5%</span>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" id="confidence-bar" style="width: 98.5%;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Details Grid -->
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <div class="detail-icon"><i class="fa-solid fa-info-circle"></i></div>
+                                <div class="detail-text">
+                                    <h4>Deskripsi Profil</h4>
+                                    <p id="roast-desc">Deskripsi mengenai biji kopi akan muncul di sini secara dinamis.</p>
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-icon"><i class="fa-solid fa-leaf"></i></div>
+                                <div class="detail-text">
+                                    <h4>Profil Rasa (Flavor Notes)</h4>
+                                    <p id="roast-flavor" class="flavor-text">Kacang-kacangan, cokelat, karamel manis.</p>
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-icon"><i class="fa-solid fa-filter"></i></div>
+                                <div class="detail-text">
+                                    <h4>Rekomendasi Seduh</h4>
+                                    <p id="roast-brew">Pour Over V60, AeroPress, Espresso.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="mock-warning" class="mock-warning hidden">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <span>Catatan: Berjalan dalam <strong>Mode Demo (Mock Mode)</strong> karena model CNN asli belum dilatih di server lokal.</span>
+                        </div>
+                    </div>
+
+                    <div class="loader hidden" id="result-loader">
+                        <div class="spinner"></div>
+                        <p>Menganalisis gambar menggunakan CNN...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quality Evaluator Section -->
+        <section id="quality-evaluator" class="section-container">
+            <div class="grid-layout">
+                <!-- Left: Form Input -->
+                <div class="card form-card">
+                    <h2 class="card-title"><i class="fa-solid fa-clipboard-list"></i> Parameter Fisik</h2>
+                    <p class="card-desc">Masukkan parameter fisik biji kopi pasca-panen untuk menentukan kualitasnya.</p>
+                    
+                    <form id="quality-form" class="eval-form">
+                        <!-- Defect Percentage -->
+                        <div class="form-group">
+                            <label for="input-defect">Persentase Kecacatan Fisik (%)</label>
+                            <div class="range-container">
+                                <input type="range" id="input-defect" min="0" max="50" step="0.5" value="5">
+                                <span class="range-value" id="val-defect">5%</span>
+                            </div>
+                            <span class="input-hint">Kecacatan seperti biji pecah, berlubang, atau hitam.</span>
+                        </div>
+
+                        <!-- Average Diameter -->
+                        <div class="form-group">
+                            <label for="input-diameter">Ukuran Diameter Rata-rata (mm)</label>
+                            <div class="range-container">
+                                <input type="range" id="input-diameter" min="4.0" max="10.0" step="0.1" value="7.0">
+                                <span class="range-value" id="val-diameter">7.0 mm</span>
+                            </div>
+                            <span class="input-hint">Mengukur kerataan dan ukuran fisik biji.</span>
+                        </div>
+
+                        <!-- Moisture Content -->
+                        <div class="form-group">
+                            <label for="input-moisture">Kadar Air (%)</label>
+                            <div class="range-container">
+                                <input type="range" id="input-moisture" min="5.0" max="25.0" step="0.1" value="12.0">
+                                <span class="range-value" id="val-moisture">12.0%</span>
+                            </div>
+                            <span class="input-hint">Kadar air optimal ekspor adalah 11% - 12.5%.</span>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fa-solid fa-calculator"></i> Evaluasi Kualitas
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Right: Evaluation Result -->
+                <div class="card result-card empty" id="quality-result-card">
+                    <div class="result-placeholder" id="quality-placeholder">
+                        <i class="fa-solid fa-clipboard-question placeholder-icon"></i>
+                        <h3>Siap Menganalisis</h3>
+                        <p>Silakan sesuaikan slider parameter di sebelah kiri dan klik **Evaluasi Kualitas** untuk menjalankan kalkulasi.</p>
+                    </div>
+
+                    <div class="result-content hidden" id="quality-content">
+                        <span class="badge" id="quality-badge">Kualitas Ekspor</span>
+                        <h2 class="result-title" id="quality-title">Kualitas Ekspor (Premium Grade)</h2>
+                        
+                        <!-- Details -->
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <div class="detail-icon"><i class="fa-solid fa-circle-info"></i></div>
+                                <div class="detail-text">
+                                    <h4>Deskripsi Mutu</h4>
+                                    <p id="quality-desc">Biji kopi memenuhi standar SNI ekspor.</p>
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-icon"><i class="fa-solid fa-circle-nodes"></i></div>
+                                <div class="detail-text">
+                                    <h4>Analisis Parameter (Catatan SNI)</h4>
+                                    <ul id="quality-reasons" class="reasons-list">
+                                        <!-- Will be populated dynamically -->
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-icon"><i class="fa-solid fa-box-open"></i></div>
+                                <div class="detail-text">
+                                    <h4>Rekomendasi Tindakan</h4>
+                                    <p id="quality-rec">Saran tindakan untuk biji kopi.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="loader hidden" id="quality-loader">
+                        <div class="spinner"></div>
+                        <p>Mengevaluasi parameter fisik...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section id="dataset-stats" class="section-container">
+            <div class="card">
+                <h2 class="card-title"><i class="fa-solid fa-chart-pie"></i> Statistik Dataset [Coffee Bean.csv]</h2>
+                <p class="card-desc">Informasi sebaran data latih, data uji, dan proporsi kelas yang digunakan dalam melatih model CNN.</p>
+                
+                <div class="stats-grid">
+                    <div class="stats-card">
+                        <span class="stats-num" id="stat-total">1,600</span>
+                        <span class="stats-label">Total Gambar</span>
+                    </div>
+                    <div class="stats-card">
+                        <span class="stats-num" id="stat-train">1,200</span>
+                        <span class="stats-label">Data Latihan (Train)</span>
+                    </div>
+                    <div class="stats-card">
+                        <span class="stats-num" id="stat-test">400</span>
+                        <span class="stats-label">Data Uji (Test)</span>
+                    </div>
+                </div>
+
+                <!-- Custom visual charts made from CSS/HTML -->
+                <div class="charts-container">
+                    <div class="chart-box">
+                        <h3>Proporsi Kelas Gambar</h3>
+                        <div class="bar-chart" id="class-chart">
+                            <!-- Populated by app.js -->
+                            <div class="chart-loading">Memuat data...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="app-footer">
+        <div class="container">
+            <p>&copy; 2026 RoastCode Coffee Classification Project. Dirancang untuk Desktop & Mobile.</p>
+        </div>
+    </footer>
+
+    <!-- Custom App Script -->
+    <script src="app.js"></script>
+</body>
+</html>
