@@ -81,6 +81,36 @@ else:
 
 
 
+def validate_coffee_image(image_bytes: bytes):
+    """
+    Verifikasi dasar untuk memastikan gambar yang diunggah memiliki profil warna biji kopi:
+    - Biji kopi (Green, Light, Medium, Dark) memiliki rentang warna hijau, cokelat, hitam.
+    - Menolak gambar berwarna neon ekstrem (seperti dominan biru/dingin) atau gambar polos satu warna.
+    """
+    try:
+        img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+        stat = ImageStat.Stat(img)
+        r_mean, g_mean, b_mean = stat.mean[:3]
+        r_std, g_std, b_std = stat.stddev[:3]
+        
+        # 1. Tolak gambar polos satu warna (solid color / blank screenshot)
+        if max(r_std, g_std, b_std) < 8.0:
+            raise ValueError("Gambar terlalu polos atau kosong. Pastikan mengunggah foto biji kopi yang jelas.")
+            
+        # 2. Tolak gambar berwarna dominan biru/ungu dingin (kopi tidak berwarna biru)
+        if b_mean > r_mean + 15 and b_mean > g_mean + 15:
+            raise ValueError("Warna gambar tidak sesuai dengan karakteristik warna biji kopi (terlalu dominan biru/dingin).")
+            
+        # 3. Tolak gambar dengan saturasi warna tidak wajar (misal pink/purple neon)
+        if r_mean > 240 and g_mean < 50 and b_mean > 200:
+            raise ValueError("Warna gambar terdeteksi tidak wajar untuk biji kopi.")
+            
+    except ValueError as ve:
+        raise ve
+    except Exception:
+        raise ValueError("Format gambar tidak valid atau berkas rusak.")
+
+
 def preprocess_image(image_bytes: bytes) -> np.ndarray:
     """Resize image to 128x128 and normalize it."""
     img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
@@ -134,6 +164,12 @@ async def predict(file: UploadFile = File(...)):
     try:
         image_bytes = await file.read()
         
+        # Pengaman/validasi: Cek apakah gambar yang diunggah benar-benar gambar biji kopi
+        try:
+            validate_coffee_image(image_bytes)
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve))
+            
         if not is_mock and model is not None:
             processed = preprocess_image(image_bytes)
             predictions = model.predict(processed)
@@ -155,8 +191,10 @@ async def predict(file: UploadFile = File(...)):
             "brew_recommendation": details['brew_recommendation'],
             "flavor_notes": details['flavor_notes']
         }
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Gagal memproses gambar: {str(e)}")
 
 
 class CoffeeQualityInput(BaseModel):

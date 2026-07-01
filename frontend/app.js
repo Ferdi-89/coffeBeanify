@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dropzoneContent = document.querySelector('.dropzone-content');
     const classifyBtn = document.getElementById('classify-btn');
     const cameraBtn = document.getElementById('camera-btn');
+    const changeImgBtn = document.getElementById('change-img-btn');
     const cameraStream = document.getElementById('camera-stream');
     const captureBtn = document.getElementById('capture-btn');
 
@@ -93,9 +94,33 @@ document.addEventListener('DOMContentLoaded', () => {
             imagePreview.style.display = 'block';
             dropzoneContent.style.display = 'none';
             classifyBtn.disabled = false;
+            
+            // Tampilkan tombol Ganti Gambar, sembunyikan tombol Kamera
+            changeImgBtn.classList.remove('hidden');
+            cameraBtn.classList.add('hidden');
         };
         reader.readAsDataURL(file);
     }
+
+    // Event Listener Ganti Gambar
+    changeImgBtn.addEventListener('click', () => {
+        selectedFile = null;
+        fileInput.value = '';
+        
+        imagePreview.src = '';
+        imagePreview.style.display = 'none';
+        dropzoneContent.style.display = 'block';
+        classifyBtn.disabled = true;
+        
+        changeImgBtn.classList.add('hidden');
+        cameraBtn.classList.remove('hidden');
+        
+        // Reset card hasil kembali kosong
+        resultContent.classList.add('hidden');
+        resultLoader.classList.add('hidden');
+        resultPlaceholder.classList.remove('hidden');
+        resultCard.classList.add('empty');
+    });
 
     // Camera Integration
     cameraBtn.addEventListener('click', async () => {
@@ -166,7 +191,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!response.ok) {
-                throw new Error('Gagal memproses gambar');
+                const errorData = await response.json().catch(() => ({}));
+                const errorMsg = errorData.error || 'Gagal memproses gambar';
+                throw new Error(errorMsg);
             }
 
             const data = await response.json();
@@ -191,9 +218,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             resultLoader.classList.add('hidden');
             resultContent.classList.remove('hidden');
+            
+            // Gulir layar secara halus ke bagian kartu hasil (auto-scroll)
+            setTimeout(() => {
+                resultCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+            
         } catch (error) {
             console.error(error);
-            alert('Terjadi kesalahan saat klasifikasi: ' + error.message);
+            alert('Klasifikasi Gagal:\n' + error.message);
             resultLoader.classList.add('hidden');
             resultPlaceholder.classList.remove('hidden');
             resultCard.classList.add('empty');
