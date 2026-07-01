@@ -101,10 +101,10 @@ def validate_coffee_image(image_bytes: bytes):
 
 
 def preprocess_image(image_bytes: bytes) -> np.ndarray:
-    """Resize gambar ke 128x128 dan normalisasi."""
+    """Resize gambar ke 128x128 dan normalisasi ke [-1, 1] untuk MobileNetV2."""
     img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     img = img.resize((128, 128))
-    img_array = np.array(img) / 255.0
+    img_array = (np.array(img) / 127.5) - 1.0
     img_array = np.expand_dims(img_array, axis=0)
     return img_array
 

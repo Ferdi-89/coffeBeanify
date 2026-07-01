@@ -7,9 +7,11 @@ from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.regularizers import l2
-from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten, Conv2D, MaxPooling2D, BatchNormalization
+from tensorflow.keras.layers import Dense, Dropout, Activation, Flatten, Conv2D, MaxPooling2D, BatchNormalization, GlobalAveragePooling2D
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 def setup_kaggle():
     print("Setting up Kaggle credentials...")
@@ -71,7 +73,7 @@ def train():
     
     print("Setting up data generators...")
     train_datagen = ImageDataGenerator(
-        rescale=1./255,
+        preprocessing_function=preprocess_input,
         rotation_range=20,
         width_shift_range=0.2,
         height_shift_range=0.2,
@@ -81,7 +83,7 @@ def train():
         fill_mode='nearest'
     )
     
-    val_test_datagen = ImageDataGenerator(rescale=1./255)
+    val_test_datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
     
     train_generator = train_datagen.flow_from_dataframe(
         dataframe=train_df,
@@ -104,37 +106,28 @@ def train():
         shuffle=False
     )
     
-    print("Building model...")
+    print("Building model (MobileNetV2 Transfer Learning)...")
     l2_strength = 0.0001
-    model = Sequential()
     
-    model.add(Conv2D(32, (3, 3), input_shape=(IMG_SIZE, IMG_SIZE, 3), kernel_regularizer=l2(l2_strength)))
-    model.add(BatchNormalization())
-    model.add(Activation("relu"))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    # Load MobileNetV2 base model pre-trained on ImageNet
+    base_model = MobileNetV2(
+        input_shape=(IMG_SIZE, IMG_SIZE, 3),
+        include_top=False,
+        weights='imagenet'
+    )
+    # Freeze the base model layers
+    base_model.trainable = False
     
-    model.add(Conv2D(64, (3, 3), kernel_regularizer=l2(l2_strength)))
-    model.add(BatchNormalization())
-    model.add(Activation("relu"))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    
-    model.add(Conv2D(64, (3, 3), kernel_regularizer=l2(l2_strength)))
-    model.add(BatchNormalization())
-    model.add(Activation("relu"))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-    model.add(Dropout(0.25))
-    
-    model.add(Flatten())
-    model.add(Dense(128, kernel_regularizer=l2(l2_strength)))
-    model.add(BatchNormalization())
-    model.add(Activation("relu"))
-    
-    model.add(Dense(128, kernel_regularizer=l2(l2_strength)))
-    model.add(BatchNormalization())
-    model.add(Activation("relu"))
-    
-    model.add(Dense(4))
-    model.add(Activation("softmax"))
+    model = Sequential([
+        base_model,
+        GlobalAveragePooling2D(),
+        Dropout(0.3),
+        Dense(128, kernel_regularizer=l2(l2_strength)),
+        BatchNormalization(),
+        Activation("relu"),
+        Dropout(0.4),
+        Dense(4, activation="softmax")
+    ])
     
     model.compile(
         loss="sparse_categorical_crossentropy",
