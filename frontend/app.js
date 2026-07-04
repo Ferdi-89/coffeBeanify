@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                const errorMsg = errorData.error || 'Gagal memproses gambar';
+                const errorMsg = errorData.detail || errorData.error || 'Gagal memproses gambar';
                 throw new Error(errorMsg);
             }
 

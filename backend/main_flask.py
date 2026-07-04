@@ -55,6 +55,16 @@ try:
 except Exception as e:
     print(f"Gagal memuat model CNN Keras: {e}. Berjalan dalam MOCK MODE.")
 
+# Memuat Model ImageNet untuk Verifikasi Gambar Acak (OOD)
+imagenet_model = None
+try:
+    if not is_mock:
+        print("Memuat model ImageNet untuk verifikasi out-of-distribution...")
+        imagenet_model = tf.keras.applications.MobileNetV2(weights='imagenet')
+        print("Model ImageNet berhasil dimuat.")
+except Exception as e:
+    print(f"Gagal memuat model ImageNet: {e}")
+
 # 2. Memuat Model Klasifikasi Mutu Kopi (Pickle)
 QUALITY_MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'coffee_quality_classifier.pkl')
 quality_model = None
@@ -72,9 +82,8 @@ else:
 
 def validate_coffee_image(image_bytes: bytes):
     """
-    Verifikasi dasar untuk memastikan gambar yang diunggah memiliki profil warna biji kopi:
-    - Biji kopi (Green, Light, Medium, Dark) memiliki rentang warna hijau, cokelat, hitam.
-    - Menolak gambar berwarna neon ekstrem (seperti dominan biru/dingin) atau gambar polos satu warna.
+    Verifikasi gambar untuk memastikan gambar yang diunggah adalah biji kopi.
+    Menggunakan checks dasar warna dan model ImageNet untuk menolak gambar random (hewan, kendaraan, orang, dll.).
     """
     try:
         img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
@@ -94,10 +103,57 @@ def validate_coffee_image(image_bytes: bytes):
         if r_mean > 240 and g_mean < 50 and b_mean > 200:
             raise ValueError("Warna gambar terdeteksi tidak wajar untuk biji kopi.")
             
+        # 4. Gunakan ImageNet model untuk menolak gambar random (hewan, manusia, kendaraan, furnitur, dll.)
+        global imagenet_model
+        if imagenet_model is not None:
+            # Resize ke 224x224 untuk MobileNetV2 ImageNet
+            img_224 = img.resize((224, 224))
+            img_array = np.array(img_224).astype(np.float32)
+            # MobileNetV2 preprocess_input: scale to [-1, 1]
+            img_array = (img_array / 127.5) - 1.0
+            img_array = np.expand_dims(img_array, axis=0)
+            
+            preds = imagenet_model.predict(img_array, verbose=0)
+            from tensorflow.keras.applications.mobilenet_v2 import decode_predictions
+            decoded = decode_predictions(preds, top=5)[0]
+            
+            # Daftar kata kunci OOD yang dilarang
+            OOD_KEYWORDS = [
+                'cat', 'dog', 'hound', 'terrier', 'retriever', 'spaniel', 'collie', 'mastiff', 'shepherd', 'poodle',
+                'pug', 'beagle', 'foxhound', 'dane', 'husky', 'dalmatian', 'boxer', 'rottweiler',
+                'lion', 'tiger', 'leopard', 'bear', 'elephant', 'zebra', 'giraffe', 'deer', 'rabbit', 'squirrel',
+                'bird', 'parrot', 'eagle', 'hawk', 'owl', 'chicken', 'duck', 'goose', 'swan',
+                'fish', 'shark', 'whale', 'dolphin',
+                'person', 'man', 'woman', 'child', 'baby', 'face', 'people', 'groom', 'bride', 'jersey', 't-shirt',
+                'car', 'truck', 'bus', 'train', 'jeep', 'cab', 'limousine', 'sports_car', 'minivan', 'racer',
+                'bicycle', 'motorcycle', 'airplane', 'airliner', 'ship', 'boat',
+                'chair', 'sofa', 'couch', 'table', 'desk', 'bed', 'wardrobe', 'cabinet',
+                'computer', 'monitor', 'laptop', 'keyboard', 'phone', 'television', 'screen',
+                'house', 'building', 'church', 'castle', 'palace', 'monument', 'tower', 'bridge'
+            ]
+            
+            for synset, label_name, prob in decoded:
+                label_lower = label_name.lower().replace('_', ' ')
+                for keyword in OOD_KEYWORDS:
+                    if keyword in label_lower and prob > 0.05:
+                        # Terjemahkan beberapa label umum ke Bahasa Indonesia untuk UX yang lebih baik
+                        indonesian_label = label_name.replace('_', ' ')
+                        if 'cat' in label_lower:
+                            indonesian_label = "kucing"
+                        elif 'dog' in label_lower or any(k in label_lower for k in ['hound', 'terrier', 'retriever', 'spaniel', 'collie', 'mastiff', 'shepherd', 'poodle', 'pug', 'beagle', 'foxhound', 'dane', 'husky', 'dalmatian', 'boxer', 'rottweiler']):
+                            indonesian_label = "anjing"
+                        elif 'car' in label_lower or 'jeep' in label_lower or 'sports_car' in label_lower:
+                            indonesian_label = "mobil"
+                        elif 'person' in label_lower or 'man' in label_lower or 'woman' in label_lower or 'child' in label_lower or 'baby' in label_lower or 'face' in label_lower or 'people' in label_lower or 'groom' in label_lower or 'bride' in label_lower:
+                            indonesian_label = "orang/manusia"
+                            
+                        raise ValueError(f"Gambar yang diunggah terdeteksi sebagai {indonesian_label} ({prob*100:.1f}%). Harap unggah foto biji kopi yang valid.")
+                        
     except ValueError as ve:
         raise ve
-    except Exception:
-        raise ValueError("Format gambar tidak valid atau berkas rusak.")
+    except Exception as e:
+        # Jika ada kesalahan internal, lewati agar alur utama tidak terganggu
+        pass
 
 
 def preprocess_image(image_bytes: bytes) -> np.ndarray:
